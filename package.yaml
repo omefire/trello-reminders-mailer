@@ -21,6 +21,16 @@ description:         Please see the README on GitHub at <https://github.com/omef
 
 dependencies:
 - base >= 4.7 && < 5
+- aeson
+- text
+- bytestring
+- time
+- opaleye
+- opaleye-trans
+- product-profunctors
+- transformers
+- postgresql-simple
+- text
 
 library:
   source-dirs: src

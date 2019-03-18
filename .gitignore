@@ -1,3 +1,4 @@
 .stack-work/
 trello-reminders-mailer.cabal
 *~
+credentials.json

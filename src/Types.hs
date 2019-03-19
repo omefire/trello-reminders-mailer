@@ -9,5 +9,6 @@ import GHC.Generics
 data Reminder = Reminder { reminderID :: Int,
                            reminderName :: String,
                            reminderDescription :: String,
-                           reminderDateTime :: UTCTime
+                           reminderDateTime :: UTCTime,
+                           reminderEmails :: [String]
                          } deriving (Eq, Show, Generic)

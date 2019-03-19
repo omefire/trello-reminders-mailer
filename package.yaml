@@ -31,6 +31,9 @@ dependencies:
 - transformers
 - postgresql-simple
 - text
+- amazonka
+- amazonka-ses
+- lens
 
 library:
   source-dirs: src

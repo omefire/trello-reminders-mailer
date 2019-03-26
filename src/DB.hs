@@ -83,10 +83,10 @@ emailTable = Table "Emails" $ pEmail EmailP
 
 
 getReminderEmails :: Int -> Transaction [ String ]
-getReminderEmails reminderId = query $ reminderEmailsQuery reminderId
+getReminderEmails reminderId = query reminderEmailsQuery
   where
-    reminderEmailsQuery :: Int -> Query ( (Column PGText) )
-    reminderEmailsQuery reminderId = proc() -> do
+    reminderEmailsQuery :: Query ( (Column PGText) )
+    reminderEmailsQuery = proc() -> do
         rems <- selectTable reminderTable -< ()
         restrict -< (remID rems) .== (pgInt4 reminderId)
 

@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module DB (getReminders) where
+module DB (getReminders, getRemindersWhoseNotificationTimeAlreadyPassed) where
 
 import Types
 import Opaleye
@@ -18,11 +18,12 @@ import Control.Monad.Trans.Class
 import Control.Arrow (returnA)
 
 
-data ReminderP i n d dt = ReminderP
+data ReminderP i n d dt p = ReminderP
   { remID :: i
   , remName :: n
   , remDescription :: d
   , remDateTime :: dt
+  , remProcessed :: p
   } deriving (Show, Eq)
 
 data ReminderResult i n d dt e = ReminderResult
@@ -43,8 +44,8 @@ data EmailP a b = EmailP
   , emEmail :: b
   }
 
-type WriteReminder = ReminderP (Maybe (Column PGInt4)) (Column PGText) (Column PGText) (Column PGTimestamptz)
-type ReadReminder = ReminderP (Column PGInt4) (Column PGText) (Column PGText) (Column PGTimestamptz)
+type WriteReminder = ReminderP (Maybe (Column PGInt4)) (Column PGText) (Column PGText) (Column PGTimestamp) (Column PGBool)
+type ReadReminder = ReminderP (Column PGInt4) (Column PGText) (Column PGText) (Column PGTimestamp) (Column PGBool)
 
 type WriteReminderResult = ReminderResult (Column PGInt4) (Column PGText) (Column PGText) (Column PGTimestamptz) [(Column PGText)]
 type ReadReminderResult = ReminderResult (Column PGInt4) (Column PGText) (Column PGText) (Column PGTimestamptz) [(Column PGText)]
@@ -65,6 +66,7 @@ reminderTable = Table "Reminders" $ pReminder ReminderP
   , remName = required "Name"
   , remDescription = required "Description"
   , remDateTime = required "ReminderDateTime"
+  , remProcessed = required "Processed"
   }
 
 reminderEmailTable :: Table (WriteReminderEmail) (ReadReminderEmail)
@@ -79,27 +81,12 @@ emailTable = Table "Emails" $ pEmail EmailP
   , emEmail = required "Email"
   }
 
--- ============  TOP LEVEL FUNCTIONS ============= --
 
-getReminders :: PSQL.Connection -> UTCTime -> UTCTime -> IO [Reminder]
-getReminders conn beginDate endDate = do
-  reminders <- runOpaleyeT conn $ transaction $ do
-    rems <- selectReminders
-    (flip mapM) rems $ \(ReminderP rId rName rDesc rDT) -> do
-      rEmails <- getReminderEmails rId
-      return (rId, rName, rDesc, rDT, rEmails)
-  return $ (flip map) reminders $ \( (rrID, rrName, rrDesc, rrDt, rrEmails) ) -> Reminder { reminderID = rrID,
-                                                                                            reminderName = rrName,
-                                                                                            reminderDescription = rrDesc,
-                                                                                            reminderDateTime = rrDt,
-                                                                                            reminderEmails = rrEmails
-                                                                                          }
-    where
-      getReminderEmails :: Int -> Transaction [ String ]
-      getReminderEmails reminderId = query $ reminderEmailsQuery reminderId
-
-      reminderEmailsQuery :: Int -> Query ( (Column PGText) )
-      reminderEmailsQuery reminderId = proc() -> do
+getReminderEmails :: Int -> Transaction [ String ]
+getReminderEmails reminderId = query $ reminderEmailsQuery reminderId
+  where
+    reminderEmailsQuery :: Int -> Query ( (Column PGText) )
+    reminderEmailsQuery reminderId = proc() -> do
         rems <- selectTable reminderTable -< ()
         restrict -< (remID rems) .== (pgInt4 reminderId)
 
@@ -111,21 +98,55 @@ getReminders conn beginDate endDate = do
 
         returnA -< (emEmail email)
 
-      selectReminders :: Transaction [ ReminderP Int String String UTCTime ]
+-- ============  TOP LEVEL FUNCTIONS ============= --
+
+getRemindersWhoseNotificationTimeAlreadyPassed :: PSQL.Connection -> LocalTime -> IO [Reminder]
+getRemindersWhoseNotificationTimeAlreadyPassed conn notificationTime = do
+  reminders <- runOpaleyeT conn $ transaction $ do
+    rems <- selectReminders
+    (flip mapM) rems $ \(ReminderP rId rName rDesc rDT rProcessed) -> do
+      rEmails <- getReminderEmails rId
+      return (rId, rName, rDesc, rDT, rEmails, rProcessed)
+  return $ (flip map) reminders $ \( (rrID, rrName, rrDesc, rrDt, rrEmails, rrProcessed) ) -> Reminder { reminderID = rrID,
+                                                                                                         reminderName = rrName,
+                                                                                                         reminderDescription = rrDesc,
+                                                                                                         reminderDateTime = rrDt,
+                                                                                                         reminderEmails = rrEmails,
+                                                                                                         reminderProcessed = rrProcessed
+                                                                                                       }
+    where
+      selectReminders :: Transaction [ ReminderP Int String String LocalTime Bool ]
       selectReminders = query $ remindersQuery
 
       remindersQuery :: Query ReadReminder
       remindersQuery = proc() -> do
         rems <- selectTable reminderTable -< ()
-        restrict -< (remDateTime rems) .>= (pgUTCTime beginDate)
-        restrict -< (remDateTime rems) .<= (pgUTCTime endDate)
-        -- restrict -< (remProcessed rems) .== (pgBool True)
+        restrict -< (remDateTime rems) .<= (pgLocalTime notificationTime)
+        restrict -< (remProcessed rems) ./= (pgBool True)
+        returnA -< (rems)
 
-        --remEmail <- selectTable reminderEmailTable -< ()
-        --restrict -< (reReminderID remEmail) .== (remID rems)
+getReminders :: PSQL.Connection -> LocalTime -> LocalTime -> Bool -> IO [Reminder]
+getReminders conn beginDate endDate processed = do
+  reminders <- runOpaleyeT conn $ transaction $ do
+    rems <- selectReminders
+    (flip mapM) rems $ \(ReminderP rId rName rDesc rDT rProcessed) -> do
+      rEmails <- getReminderEmails rId
+      return (rId, rName, rDesc, rDT, rEmails, rProcessed)
+  return $ (flip map) reminders $ \( (rrID, rrName, rrDesc, rrDt, rrEmails, rrProcessed) ) -> Reminder { reminderID = rrID,
+                                                                                                         reminderName = rrName,
+                                                                                                         reminderDescription = rrDesc,
+                                                                                                         reminderDateTime = rrDt,
+                                                                                                         reminderEmails = rrEmails,
+                                                                                                         reminderProcessed = rrProcessed
+                                                                                                       }
+    where
+      selectReminders :: Transaction [ ReminderP Int String String LocalTime Bool ]
+      selectReminders = query $ remindersQuery
 
-        --email <- selectTable emailTable -< ()
-        --restrict -< (reEmailID remEmail) .== (emID email)
-
-        --returnA -< ( (remID rems), (remName rems), (remDescription rems), (remDateTime rems) )
+      remindersQuery :: Query ReadReminder
+      remindersQuery = proc() -> do
+        rems <- selectTable reminderTable -< ()
+        restrict -< (remDateTime rems) .>= (pgLocalTime beginDate)
+        restrict -< (remDateTime rems) .<= (pgLocalTime endDate)
+        restrict -< (remProcessed rems) ./= (pgBool processed)
         returnA -< (rems)

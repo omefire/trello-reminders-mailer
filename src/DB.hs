@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module DB (getReminders, getRemindersWhoseNotificationTimeAlreadyPassed) where
+module DB (getReminders, getRemindersWhoseNotificationTimeAlreadyPassed, markReminderAsProcessed) where
 
 import Types
 import Opaleye
@@ -125,6 +125,7 @@ getRemindersWhoseNotificationTimeAlreadyPassed conn notificationTime = do
         restrict -< (remProcessed rems) ./= (pgBool True)
         returnA -< (rems)
 
+-- Note: set processed to False if you want to retrieve reminders that haven't been processed yet, and to True otherwise.
 getReminders :: PSQL.Connection -> LocalTime -> LocalTime -> Bool -> IO [Reminder]
 getReminders conn beginDate endDate processed = do
   reminders <- runOpaleyeT conn $ transaction $ do
@@ -148,5 +149,17 @@ getReminders conn beginDate endDate processed = do
         rems <- selectTable reminderTable -< ()
         restrict -< (remDateTime rems) .>= (pgLocalTime beginDate)
         restrict -< (remDateTime rems) .<= (pgLocalTime endDate)
-        restrict -< (remProcessed rems) ./= (pgBool processed)
+        restrict -< (remProcessed rems) .== (pgBool processed)
         returnA -< (rems)
+
+markReminderAsProcessed :: PSQL.Connection -> Int -> IO (Maybe Int)
+markReminderAsProcessed conn reminderId = do
+  res <- runOpaleyeT conn $ transaction $ updateReminderAsProcessed
+  return res
+  where
+    updateReminderAsProcessed :: Transaction (Maybe Int)
+    updateReminderAsProcessed = updateReturningFirst
+                                  reminderTable
+                                  (\r -> ReminderP (Just (remID r)) (remName r) (remDescription r) (remDateTime r) (pgBool True))
+                                  (\r -> ( (remID r) .== (pgInt4 reminderId) ))
+                                  remID

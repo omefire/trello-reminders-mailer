@@ -70,13 +70,15 @@ main = do
                     -- Test: What if email sending fails? => email not sent + processed column = false + exception caught (DONE)
                     -- Test: What if email sending succeeds, but processed column does not succeed in being marked true? => The user will have to live with multiple emails received (DONE)
                     _ <- Email.sendEmail from to reminder
-                    _ <- markReminderAsProcessed conn (reminderID reminder)
                     -- atomicPutStrLn "Email sent !!!!!!!!!!!!!!!"
                     return ()
                 )
                 (\ex -> do
                     atomicPutStrLn $ "An exception occured: " <> show ex
                 )
+            -- TODO: In the future, instead of marking a reminder as processed because we have attempted to send emails to its recipients,
+            --    ... we should instead, flag it for human review in case any of the emails sent failed
+            markReminderAsProcessed conn (reminderID reminder)
 
         -- TODO: How to handle exceptions raised by another thread? => Not necessary (DONE)
         -- TODO: Log stuff into a log file, not on the console

@@ -2,3 +2,4 @@
 trello-reminders-mailer.cabal
 *~
 credentials.json
+awsConfig.json

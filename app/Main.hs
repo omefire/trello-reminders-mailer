@@ -61,36 +61,37 @@ main = do
             return (rems1 <> rems2)
 
           forM_ reminders $ \reminder -> do
-            -- atomicPutStrLn $ "Reminder ID: " <> show (reminderID reminder)
             forM_ (reminderEmails reminder) $ \reminderEmail -> do
               let from = Email.From senderEmail
               let to = Email.To $ pack reminderEmail
               forkIO $ catchAny
                 (do
+                    -- Test: What if email is successfully sent? => email received + processed column = true (DONE)
+                    -- Test: What if email sending fails? => email not sent + processed column = false + exception caught (DONE)
+                    -- Test: What if email sending succeeds, but processed column does not succeed in being marked true? => The user will have to live with multiple emails received (DONE)
                     _ <- Email.sendEmail from to reminder
-                    atomicPutStrLn "Email sent !!!!!!!!!!!!!!!"
+                    _ <- markReminderAsProcessed conn (reminderID reminder)
+                    -- atomicPutStrLn "Email sent !!!!!!!!!!!!!!!"
+                    return ()
                 )
                 (\ex -> do
                     atomicPutStrLn $ "An exception occured: " <> show ex
                 )
 
-        -- mapM_ Main.sendEmail reminders
-        -- TODO: How to handle exceptions raised by another thread?
+        -- TODO: How to handle exceptions raised by another thread? => Not necessary (DONE)
+        -- TODO: Log stuff into a log file, not on the console
         -- TODO: If sending an email to a recipient fails, it should not impact another one
-        -- TODO: Mark emails as processed once completed
-        -- TODO: What if email sending fails? Bad AWS SES credentials? Wrong/Inexistent email address? Other reasons?
-        -- TODO: What if this program crashes? Should we reload all reminders that should have been processed in the past, but weren't?
-        -- TODO: In case of program crash or restarting, should we process past reminders that should have been processed but weren't?
-        -- TODO: How can we make the query not scan the whole Reminders table?
-        -- TODO: What if AWS SES is down? Let the users know we're currently unstable? (Very rare occasion probably)
-        -- TODO: Test: while this program is already running, make sure to add a new reminder to the db that should execute in the next 2 mins and see if it gets processed correctly
-        -- TODO: Test: while this program is already running, make sure to add a new reminder to the db that should execute in the next 5 mins and see if it gets processed correctly
-        -- TODO: Test: while this program is already running, make sure to add a new reminder to the db that should execute in the next 3 mins and see if it gets processed correctly
-        -- TODO: Brainstorm other what/if scenarios
-        -- TODO: Send off emails in separate threads
+        -- TODO: Mark emails as processed once completed (DONE)
+        -- TODO: What if email sending fails? Bad AWS SES credentials? Wrong/Inexistent email address? Other reasons? => Exception logged & process continues (DONE)
+        -- TODO: What if this program crashes? Should we reload all reminders that should have been processed in the past, but weren't? => They'll be sent upon program execution (DONE)
+        -- TODO: In case of program crash or restarting, should we process past reminders that should have been processed but weren't? => YES (DONE)
+        -- TODO: How can we make the query not scan the whole Reminders table? => TODO
+        -- TODO: What if AWS SES is down? Let the users know we're currently unstable? (Very rare occasion probably) => No! (DONE)
+        -- TODO: Test: while this program is already running, make sure to add a new reminder to the db that should execute in the next 2 mins and see if it gets processed correctly (DONE)
+        -- TODO: Test: while this program is already running, make sure to add a new reminder to the db that should execute in the next 5 mins and see if it gets processed correctly (DONE)
+        -- TODO: Test: while this program is already running, make sure to add a new reminder to the db that should execute in the next 3 mins and see if it gets processed correctly (DONE)
+        -- TODO: Brainstorm other what/if scenarios (DONE)
+        -- TODO: Send off emails in separate threads (DONE)
+        -- TODO: A reminder that should notify multiple email addresses (DONE)
         atomicPutStrLn "ONE LOOP DONE!"
-        threadDelay 180000000
-
--- TODO: After email is sent successfully, mark it as processed in the database
-sendEmail :: Reminder -> IO ()
-sendEmail _rem = putStrLn $ "Reminder: " ++ (reminderName _rem)
+        threadDelay 180000000 -- Pause execution for at least 3 mins

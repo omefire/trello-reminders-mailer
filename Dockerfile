@@ -3,7 +3,7 @@ RUN mkdir -p /opt/trello-reminders-mailer
 ADD . /opt/trello-reminders-mailer
 WORKDIR /opt/trello-reminders-mailer
 RUN cd /opt/trello-reminders-mailer/
-RUN apt-get update && apt-get install libpq-dev
+RUN apt-get update && apt-get install libpq-dev -y
 RUN stack setup
 RUN stack build
 CMD ["./opt/trello-reminders-mailer/trello-reminders-mailer-exe"]

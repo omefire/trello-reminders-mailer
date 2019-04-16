@@ -6,7 +6,8 @@ RUN cd /opt/trello-reminders-mailer/
 RUN apt-get update && apt-get install libpq-dev -y
 RUN stack setup
 RUN stack build
-CMD ["/opt/trello-reminders-mailer/trello-reminders-mailer-exe"]
+RUN stack install trello-reminders-mailer
+CMD ["trello-reminders-mailer-exe"]
 
 # FROM fpco/stack-build:lts-13.8 as build
 # RUN mkdir -p /opt/build

@@ -4,7 +4,7 @@ ADD . /opt/trello-reminders-mailer
 ADD ./awsConfig.json /opt/trello-reminders-mailer/awsConfig.json
 ADD ./credentials.json /opt/trello-reminders-mailer/credentials.json
 WORKDIR /opt/trello-reminders-mailer
-RUN cd /opt/trello-reminders-mailer/
+# RUN cd /opt/trello-reminders-mailer/
 RUN apt-get update && apt-get install libpq-dev -y
 RUN stack setup
 RUN stack build

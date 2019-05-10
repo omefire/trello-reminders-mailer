@@ -13,7 +13,8 @@ RUN stack build
 # CP awsConfig.json ~/.local/bin/
 # CMD ["trello-reminders-mailer-exe"]
 # CMD [$(stack path --dist-ditr)/build/trello-reminders-mailer-exe/trello-reminders-mailer-exe]
-CMD [".stack-work/dist/x86_64-linux/Cabal-2.4.0.1/build/trello-reminders-mailer-exe/trello-reminders-mailer-exe"]
+# CMD [".stack-work/dist/x86_64-linux/Cabal-2.4.0.1/build/trello-reminders-mailer-exe/trello-reminders-mailer-exe"]
+ENTRYPOINT ["stack", "exec", "trello-reminders-mailer-exe"]
 
 # FROM fpco/stack-build:lts-13.8 as build
 # RUN mkdir -p /opt/build
